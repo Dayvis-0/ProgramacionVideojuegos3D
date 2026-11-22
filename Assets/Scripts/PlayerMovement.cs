@@ -17,6 +17,10 @@ public class PlayerMovement : MonoBehaviour
     // Unidades por segundo corriendo (Shift izquierdo mantenido).
     public float velocidadCorrer = 6f;
 
+    // Tecla que dispara el golpe. Se puede cambiar desde el Inspector sin
+    // tocar el código.
+    public KeyCode teclaGolpe = KeyCode.F;
+
     // Velocidad vertical acumulada. Se integra cada frame para producir la gravedad.
     private float velocidadY = 0f;
 
@@ -50,6 +54,13 @@ public class PlayerMovement : MonoBehaviour
             Input.GetAxisRaw("Horizontal"),
             Input.GetAxisRaw("Vertical"));
 
+        // Disparo del golpe: GetKeyDown detecta la pulsación una sola vez.
+        // Con GetKey se dispararía en cada frame mientras esté apretada.
+        if (Input.GetKeyDown(teclaGolpe))
+        {
+            animador.SetTrigger("Punch");
+        }
+
         // 2. Derivamos el estado a partir de la entrada antes de usarlo.
         //    magnitude vale 0 quieto, 1 en un solo eje y ~1.41 en diagonal.
         seEstaMoviendo = entradaMovimiento.magnitude > 0.1f;
@@ -59,6 +70,14 @@ public class PlayerMovement : MonoBehaviour
         float velocidadActual = (estaCorriendo && seEstaMoviendo)
             ? velocidadCorrer
             : velocidadCaminar;
+
+        // Si el Animator está reproduciendo el golpe, anulamos la velocidad
+        // horizontal para que el personaje no patine mientras pega.
+        // La componente Y la sigue manejando la gravedad.
+        if (EstaGolpeando())
+        {
+            velocidadActual = 0f;
+        }
 
         // 4. Movimiento vertical: nos pegamos al suelo y después integramos la gravedad.
         if (controladorPersonaje.isGrounded && velocidadY < 0f)
@@ -91,13 +110,25 @@ public class PlayerMovement : MonoBehaviour
     }
 
     /// <summary>
+    /// Devuelve true mientras la capa base del Animator está reproduciendo
+    /// el estado Punching.
+    /// </summary>
+    private bool EstaGolpeando()
+    {
+        // La animación es la única fuente de verdad de "estoy golpeando".
+        // Un bool propio en el script habría que apagarlo a mano cuando
+        // termina el clip, y esa es la fuente típica de bugs de estado trabado.
+        return animador.GetCurrentAnimatorStateInfo(0).IsName("Punching");
+    }
+
+    /// <summary>
     /// Copia el estado actual de movimiento a los parámetros del Animator.
     /// </summary>
     public void ActualizarAnimaciones()
     {
-        // Ojo: "IsMoving" e "IsRunning" son los nombres de los parámetros del
-        // Animator Controller, NO variables. Deben coincidir exactamente con los
-        // que creaste en el Animator, por eso quedan en inglés.
+        // Ojo: "seEstaMoviendo" y "estaCorriendo" son los nombres de los
+        // parámetros del Animator Controller, NO variables. Deben coincidir
+        // exactamente con los que creaste en el Animator.
         animador.SetBool("seEstaMoviendo", seEstaMoviendo);
 
         // Correr solo tiene sentido si el jugador realmente se está moviendo.
